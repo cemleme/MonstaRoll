@@ -1,0 +1,28 @@
+.iconButton {
+    width: 5rem;
+    height: 4rem;
+    border-radius: 10px;
+    background-color: #3c6e57;
+    color: #bbe06c;
+    font-size: 14px;
+}
+
+.small {
+  height: 2rem;
+}
+
+.long {
+  width: 10rem;
+}
+
+.iconButton:hover {
+  background-color: #bbe06c;
+  color: #3c6e57;
+}
+
+.iconButton:disabled,
+.iconButton[disabled]{
+  border: 1px solid #999999;
+  background-color: #cccccc;
+  color: #666666;
+}
