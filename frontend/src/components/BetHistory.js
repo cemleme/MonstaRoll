@@ -23,23 +23,24 @@ const BetHistory = ({
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between"
+          justifyContent: "space-between",
         }}
       >
-        {mintableRounds.length > 0 && (
-          <IconButton
-            icon={faHammer}
-            isLong={true}
-            text={"  Mint " + mintableRounds.length + " NFT"}
-            handler={() => handleMint(mintableRounds)}
-          />
-        )}
         {claimableRounds.length > 0 && (
           <IconButton
             icon={faCoins}
             isLong={true}
             text={"  Claim " + claimableRounds.length + " Bet"}
             handler={() => handleClaim(claimableRounds)}
+          />
+        )}
+        <div></div>
+        {mintableRounds.length > 0 && (
+          <IconButton
+            icon={faHammer}
+            isLong={true}
+            text={"  Mint " + mintableRounds.length + " NFT"}
+            handler={() => handleMint(mintableRounds)}
           />
         )}
       </div>
@@ -49,7 +50,7 @@ const BetHistory = ({
           .reverse()
           .map((r) => (
             <BetRow
-              key={r.round}
+              key={r.epoch}
               round={r}
               handleClaim={handleClaim}
               handleMint={handleMint}

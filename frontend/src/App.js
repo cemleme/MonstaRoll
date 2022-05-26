@@ -1,14 +1,30 @@
-import logo from "./logo.svg";
+import Header from "./components/Header";
 import "./App.css";
+import {
+  BrowserRouter,
+  Routes,
+  Route
+} from "react-router-dom";
+import Landing from "./pages/Landing";
+import Bet from "./pages/Bet";
+import Nfts from "./pages/Nfts";
+import Raffle from "./pages/Raffle";
+import Market from "./pages/Market";
+
 
 function App() {
   return (
-    <div className="App">
-        <header className="App-header">
-          <iframe src="https://embed.lottiefiles.com/animation/82519"></iframe>
-          <p>MONSTAROLL</p>
-          <p>Developed for Chainlink Hackathon Spring 2022</p>
-        </header>
+    <div>
+      <BrowserRouter>
+        <Header />
+        <Routes>
+          <Route path="/" element={<Landing />} />
+          <Route path="bets" element={<Bet />} />
+          <Route path="nfts" element={<Nfts />} />
+          <Route path="market" element={<Market />} />
+          <Route path="raffle" element={<Raffle />} />
+        </Routes>
+      </BrowserRouter>
     </div>
   );
 }

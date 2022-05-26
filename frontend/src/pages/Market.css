@@ -1,0 +1,21 @@
+.marketContainer {
+    display:flex;
+    flex-direction:column;
+    width: 100%;
+    padding:20px;
+    justify-content: center;
+    align-items: center;
+}
+
+.itemFilter {
+    width: 500px;
+}
+
+.itemsGroup {
+    width: 500px;
+}
+
+.saleItem {
+    display:flex;
+    justify-content: space-between;
+}

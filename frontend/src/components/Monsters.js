@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import monster0 from "../assets/monster0.png";
 import monster1 from "../assets/monster1.png";
 import monster2 from "../assets/monster2.png";
@@ -7,7 +7,7 @@ import monster4 from "../assets/monster4.png";
 
 const monsterImages = [monster0, monster1, monster2, monster3, monster4];
 
-const Monsters = ({ roundResult, size, animate }) => {
+const Monsters = React.forwardRef(({ roundResult, size, animate }, ref) => {
   const [monstersArr, setMonstersArr] = useState([]);
 
   useEffect(() => {
@@ -20,8 +20,9 @@ const Monsters = ({ roundResult, size, animate }) => {
       style={{
         display: "flex",
         gap: "10px",
-        alignItems: "center"
+        alignItems: "center",
       }}
+      ref={ref}
     >
       {monstersArr.map((id, index) => (
         <img
@@ -40,6 +41,6 @@ const Monsters = ({ roundResult, size, animate }) => {
       ))}
     </div>
   );
-};
+});
 
 export default Monsters;

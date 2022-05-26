@@ -1,9 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import Header from "./components/Header";
 import reportWebVitals from "./reportWebVitals";
-import Bet from "./pages/Bet";
 import "bootstrap/dist/css/bootstrap.min.css";
 import "./index.css";
 import { Provider } from "react-redux";
@@ -15,8 +13,7 @@ root.render(
   <React.StrictMode>
     <Provider store={store}>
       <ConnectProvider>
-        <Header />
-        <Bet />
+        <App />
       </ConnectProvider>
     </Provider>
   </React.StrictMode>

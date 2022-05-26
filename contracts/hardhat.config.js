@@ -1,5 +1,7 @@
 require("@nomiclabs/hardhat-waffle");
-//require("hardhat-gas-reporter");
+require("dotenv").config();
+require("hardhat-gas-reporter");
+
 
 // This is a sample Hardhat task. To learn how to create your own go to
 // https://hardhat.org/guides/create-task.html
@@ -30,6 +32,18 @@ module.exports = {
   networks: {
     bscTestnet: {
       url: `https://data-seed-prebsc-1-s1.binance.org:8545/`,
+      accounts: [
+        process.env.PK
+      ],
+    },    
+    avalanche: {
+      url: `https://api.avax-test.network/ext/bc/C/rpc`,
+      accounts: [
+        process.env.PK
+      ],
+    },    
+    polygon: {
+      url: `https://matic-mumbai.chainstacklabs.com`,
       accounts: [
         process.env.PK
       ],

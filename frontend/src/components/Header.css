@@ -1,12 +1,18 @@
 .topnav {
     background-color: #333;
-    overflow: hidden;
     color: #fff;
+    display: flex;
+    position: fixed;
+    top:0;
+    width: 100%;   
+    overflow: auto;
+    height: auto;
+    z-index: 100;
   }
   
   /* Style the links inside the navigation bar */
   .topnav a, .topnav button {
-    float: left;
+    display: inline-block;
     color: #f2f2f2;
     background-color: transparent;
     text-align: center;
@@ -26,6 +32,16 @@
     background-color: #04AA6D;
     color: white;
   }
+
+  .left-links{
+    display: flex;
+    flex: 1 1 300px;
+}  
+.right-links{
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
 
   .topRight {
       float: right;

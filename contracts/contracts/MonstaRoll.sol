@@ -51,13 +51,26 @@ contract MonstaRoll is
         bool fulfilled;
     }
 
+    struct Sale {
+        address seller;
+        uint tokenId;
+        uint price;
+        bool closed; 
+    }
+    
+    mapping (address => mapping(uint256 => bool)) isTokenOnSale;
+    mapping (bytes32 => Sale) salesRegistry;
+    uint saleNonce;
+
     uint256 public safeBalance;
     uint256 public treasury;
     uint256 public safeRate = 690; //to be divided by 1000
     uint256 public treasuryRate = 10; //to be divided by 1000
     uint256 public raffleRate = 300; //to be divided by 1000
 
-    uint256 public raffleDuration = 1 weeks;
+    uint256 public minBet = 0.00001 ether;
+
+    uint256 public raffleDuration = 10 minutes;
     uint256 public ticketPerAmount = 0.01 ether;
     uint256 public currentRaffleRound;
     uint64 public nftRewardBalanceLeft;
@@ -88,18 +101,29 @@ contract MonstaRoll is
     //VRF Properties
 
     VRFCoordinatorV2Interface COORDINATOR;
-    uint64 s_subscriptionId = 648;
-    //address vrfCoordinator = 0x6A2AAd07396B36Fe02a22b33cf443582f682c82f;
-    bytes32 keyHash =
-        0xd4bb89654db74673a187bd804519e65e3f71a52bc55f11da7601a13dcf505314;
-    uint32 callbackGasLimit = 100000;
+    uint64 s_subscriptionId;
+    bytes32 keyHash;
+    uint32 callbackGasLimit = 400000;
     uint16 requestConfirmations = 3;
     uint32 numWords = 2;
 
     ///// VRF
 
-    constructor(address vrfCoordinator)
-        ERC1155("https://ipfs.io/ipfs/bafybeibspyh5mdop4yj3tmxwoimye267uriu3wwwndmvaphxpq4opppeda/{id}.json")
+    //EVENTS
+    event SetRaffleDuration(uint256 _raffleDuration);
+    event SetTicketPerAmount(uint256 _amount);
+    event Play(address user, uint256 betAmount, uint256 numDraw);
+    event ClaimBet(address user, uint256 epochs, uint256 betAmount, uint256 reward);
+    event ExecuteRaffleRound(address user, uint256 epoch);
+    event ClaimNFTRaffle(address user, uint256 epoch, uint256 reward);
+    event ClaimRaffle(address user, uint256 epoch, uint256 amount);
+    event MintNFT(address user, uint256 nftId);
+    event SalePlaced(bytes32 saleId, address _seller, uint256 _tokenId, uint256 _price);
+    event SaleClosed(bytes32 saleId, address closer, address seller);
+    //------
+
+    constructor(address vrfCoordinator, bytes32 _keyHash, uint64 _s_subscriptionId)
+        ERC1155("https://ipfs.io/ipfs/bafybeickg4p64kr4ew7eii7kcsdllll3hjw7h4mjjl7p4ul3rhpw6xwexy/{id}.json")
         VRFConsumerBaseV2(vrfCoordinator)
     {
         payoutAmounts[ResultType.NONE] = 0;
@@ -110,6 +134,8 @@ contract MonstaRoll is
         payoutAmounts[ResultType.FOUR_KIND] = 250;
         payoutAmounts[ResultType.FIVE_KIND] = 3000;
 
+        s_subscriptionId = _s_subscriptionId;
+        keyHash = _keyHash;
         COORDINATOR = VRFCoordinatorV2Interface(vrfCoordinator);
 
         startNewRaffleRound();
@@ -117,6 +143,10 @@ contract MonstaRoll is
 
 
     //SETTER FUNCTIONS
+
+        function setCallbackGasLimit(uint32 _limit) external onlyOwner {
+            callbackGasLimit = _limit;
+        }
 
         function setPayouts(uint256[] calldata payouts) external onlyOwner {
             require(payouts.length == 7, "enter for all results");
@@ -149,12 +179,12 @@ contract MonstaRoll is
 
         function setRaffleDuration(uint256 _raffleDuration) external onlyOwner {
             raffleDuration = _raffleDuration;
-
-            //emit SetRaffleDuration(_raffleDuration);
+            emit SetRaffleDuration(_raffleDuration);
         }
 
-        function setTickerPerAmount(uint256 _amount) external onlyOwner {
+        function setTicketPerAmount(uint256 _amount) external onlyOwner {
             ticketPerAmount = _amount;
+            emit SetTicketPerAmount(_amount);
         }
 
     ///-------- SETTER FUNCTIONS
@@ -258,10 +288,9 @@ contract MonstaRoll is
     //BETTING
 
         function play(uint8 numDraw) external payable nonReentrant {
+            require(msg.value > minBet, "<minbet");
             uint256 ticketAmount = 1 + msg.value / ticketPerAmount;
             _addUserTicket(msg.sender, ticketAmount);
-
-            numUserBets[msg.sender] += numDraw;
 
             safeBalance += msg.value * safeRate / 1000;
             treasury += msg.value * treasuryRate / 1000;
@@ -283,11 +312,14 @@ contract MonstaRoll is
                 numDraw,
                 uint64(betAmount)
             );
+
+            emit Play(msg.sender, betAmount, numDraw);
         }
 
         function fulfillBet(uint256 rnd, RequestData memory req) internal {
             uint256 epoch = userEpoch[req.user];
             userBets[req.user][epoch].numBets = uint8(req.numDraw);
+            numUserBets[req.user] += req.numDraw;
 
             //loop through each drawing
             for (uint256 i = 0; i < req.numDraw; i++) {
@@ -330,7 +362,7 @@ contract MonstaRoll is
                     payoutAmounts[ResultType(bet.resultType)] / 100;
                 reward += amount;
 
-                //emit Claim(msg.sender, epochs[i], bet.betAmount, amount);
+                emit ClaimBet(msg.sender, epochs[i], bet.betAmount, amount);
             }
 
             if (reward > 0) _transferAmount(msg.sender, reward);
@@ -411,6 +443,8 @@ contract MonstaRoll is
                 callbackGasLimit,
                 numWords
             );
+
+            emit ExecuteRaffleRound(msg.sender, currentRaffleRound);
         }
 
         function startNewRaffleRound() internal {
@@ -458,6 +492,8 @@ contract MonstaRoll is
             round.raffleClaimed = true;
             uint256 amount = round.balance / 2;
             _safeTransfer(address(msg.sender), amount);
+
+            emit ClaimRaffle(msg.sender, roundNo, amount);
         }
 
         function claimableNFTRaffle(address user) public view returns (bool) {
@@ -487,6 +523,7 @@ contract MonstaRoll is
             uint256 reward = nftAmount * round.rewardPerNft;
             nftRewardBalanceLeft -= uint64(reward);
             if (reward > 0) _transferAmount(msg.sender, reward);
+            emit ClaimNFTRaffle(msg.sender, currentRaffleRound-1, reward);
         }
 
         function _addUserTicket(address _userAddress, uint256 ticketAmount) internal {
@@ -504,6 +541,9 @@ contract MonstaRoll is
             }
         }
 
+        function getTotalRaffleTickets() external view returns (uint256) {
+            return raffleRounds[currentRaffleRound].entrants.length;
+        }
 
     //------- RAFFLE
 
@@ -516,7 +556,46 @@ contract MonstaRoll is
                 require(!bet.minted, "already minted");
                 bet.minted = true;
                 _mint(msg.sender, bet.result, 1, "");
+                emit MintNFT(msg.sender, bet.result);
             }
+        }
+
+        function putOnSale(uint256 _tokenId, uint256 _price) external {
+            require(balanceOf(msg.sender, _tokenId) > 0, 'No nft to sell');
+            require(!isTokenOnSale[msg.sender][_tokenId], "Token is already on sale");
+            bytes32 saleId = keccak256(abi.encodePacked(saleNonce, _tokenId, msg.sender));
+            isTokenOnSale[msg.sender][_tokenId] = true;
+            salesRegistry[saleId].seller = msg.sender;
+            salesRegistry[saleId].tokenId = _tokenId;
+            salesRegistry[saleId].price = _price;
+            saleNonce += 1;
+            emit SalePlaced(saleId, msg.sender, _tokenId, _price);
+        }
+
+        function cancelSale(bytes32 _saleId) external {
+            require(msg.sender == salesRegistry[_saleId].seller, "Not enough funds to buy");
+            require(salesRegistry[_saleId].closed != true, "Sale is already closed");
+            salesRegistry[_saleId].closed = true;
+            isTokenOnSale[msg.sender][salesRegistry[_saleId].tokenId] = false;
+            emit SaleClosed(_saleId, msg.sender, msg.sender);
+        } 
+
+        function buyNFT(bytes32 _saleId) external payable nonReentrant {
+            require(msg.value >= salesRegistry[_saleId].price, "Not enough funds to buy");
+            require(salesRegistry[_saleId].closed != true, "Sale is closed");
+            salesRegistry[_saleId].closed = true;
+            isTokenOnSale[msg.sender][salesRegistry[_saleId].tokenId] = false;
+            _transferAmount(salesRegistry[_saleId].seller, msg.value);
+            safeTransferFrom(salesRegistry[_saleId].seller, msg.sender, salesRegistry[_saleId].tokenId, 1, '');
+            emit SaleClosed(_saleId, msg.sender, salesRegistry[_saleId].seller);
+        } 
+
+        function isOnSale(bytes32 _offeringId) external view returns (bool){
+            return salesRegistry[_offeringId].price > 0 && !salesRegistry[_offeringId].closed;
+        }
+
+        function viewOfferingNFT(bytes32 _offeringId) external view returns (uint, uint, bool){
+            return (salesRegistry[_offeringId].tokenId, salesRegistry[_offeringId].price, salesRegistry[_offeringId].closed);
         }
 
         function _beforeTokenTransfer(

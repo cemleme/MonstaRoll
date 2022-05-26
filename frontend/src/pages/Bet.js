@@ -5,6 +5,8 @@ import Monsters from "../components/Monsters";
 import NewBet from "../components/NewBet";
 import BetHistory from "../components/BetHistory";
 import ConnectContext from "../hooks/ConnectContext";
+import Lottie from "react-lottie";
+import * as animationData from "../assets/loading.json";
 
 import {
   faCaretUp,
@@ -82,35 +84,71 @@ const mockBets = [
   },
 ];
 
-const useMock = true;
+const useMock = false;
 
 const Bet = () => {
   const { address } = useContext(ConnectContext);
   const { getUserBets, getBet, mint, claimBet } = useContract();
   const [round, setRound] = useState(0);
+  const [isBetting, setIsBetting] = useState(false);
   const [currentBet, setCurrentBet] = useState(null);
-  const [newBet, setNewBet] = useState(false);
+  const [newBet, setNewBet] = useState(true);
   const [allResults, setAllResults] = useState(false);
   const [allRounds, setAllRounds] = useState([]);
   const [claimableRounds, setClaimableRounds] = useState([]);
   const [mintableRounds, setMintableRounds] = useState([]);
 
   const processRounds = (data) => {
+    const bets = [];
     const mintable = [];
     const claimable = [];
     for (let i = 0; i < data.length; i++) {
-      const bet = data[i];
-      bet.resultName = types[bet.resultType];
-      bet.wonAmount = (bet.betAmount * payouts[bet.resultType]) / 100;
-      bet.result = bet.result.toString().padStart(5, "0");
+      const betData = data[i];
+      const bet = {
+        betAmount: betData.betAmount / 10 ** 18,
+        epoch: betData.epoch,
+        rewardAmount: betData.rewardAmount / 10 ** 18,
+        result: betData.result.toString().padStart(5, "0"),
+        resultType: betData.resultType,
+        claimed: betData.claimed,
+        minted: betData.minted,
+        numBets: betData.numBets,
+        resultName: types[betData.resultType],
+        wonAmount:
+          (betData.betAmount * payouts[betData.resultType]) / (100 * 10 ** 18),
+      };
 
+      bets.push(bet);
       if (!bet.minted) mintable.push(i);
       if (!bet.claimed && bet.wonAmount > 0) claimable.push(i);
     }
     setClaimableRounds(claimable);
     setMintableRounds(mintable);
-    return data;
+
+    return bets;
   };
+
+  useEffect(() => {
+    let interval;
+
+    if (isBetting) {
+      interval = setInterval(async () => {
+        const userBets = await getUserBets();
+        const betsArr = userBets[0];
+        if (betsArr.length !== allRounds.length) {
+          setAllRounds(processRounds(betsArr));
+          setIsBetting(false);
+          setAllResults(false);
+          setNewBet(false);
+          setRound(betsArr.length - 1);
+        }
+      }, 2000);
+    } else {
+      clearInterval(interval);
+    }
+
+    return () => clearInterval(interval);
+  }, [isBetting]);
 
   useEffect(() => {
     if (useMock) {
@@ -120,7 +158,10 @@ const Bet = () => {
       if (!address) return;
       const loadData = async () => {
         const userBets = await getUserBets();
-        setAllRounds(processRounds(userBets[0]));
+        const betsArr = userBets[0];
+        setAllRounds(processRounds(betsArr));
+
+        setRound(betsArr.length);
       };
       loadData();
     }
@@ -129,12 +170,13 @@ const Bet = () => {
   useEffect(() => {
     if (round >= allRounds.length) return;
     setCurrentBet(allRounds[round]);
-  }, [round]);
+  }, [round, allRounds]);
 
-  useEffect(() => {
-    const roundNo = allRounds.length > 0 ? allRounds.length - 1 : 0;
-    setRound(roundNo);
-  }, [allRounds]);
+  // useEffect(() => {
+  //   if (allRounds.length < 1) return;
+  //   const roundNo = allRounds.length;
+  //   setRound(roundNo);
+  // }, [allRounds]);
 
   const handleButtonUp = () => {
     setAllResults(false);
@@ -163,12 +205,34 @@ const Bet = () => {
     setCurrentBet(null);
   };
 
-  const handleMint = (rounds) => {
-    mint(rounds);
+  const handleMint = async (rounds) => {
+    await mint(rounds);
+    if (currentBet) {
+      setCurrentBet((bet) => ({ ...bet, minted: true }));
+    }
+    const allRoundsCp = allRounds;
+    let mintableCp = mintableRounds;
+    for (let i = 0; i < rounds.length; i++) {
+      allRoundsCp.find((r) => r.epoch === rounds[i].toString()).minted = true;
+      mintableCp = mintableCp.filter((item) => item !== rounds[i]);
+    }
+    setAllRounds(allRoundsCp);
+    setMintableRounds(mintableCp);
   };
 
-  const handleClaim = (rounds) => {
-    claimBet(rounds);
+  const handleClaim = async (rounds) => {
+    await claimBet(rounds);
+    if (currentBet) {
+      setCurrentBet((bet) => ({ ...bet, claimed: true }));
+    }
+    const allRoundsCp = allRounds;
+    let claimableCp = claimableRounds;
+    for (let i = 0; i < rounds.length; i++) {
+      allRoundsCp.find((r) => r.epoch === rounds[i].toString()).claimed = true;
+      claimableCp = claimableCp.filter((item) => item !== rounds[i]);
+    }
+    setAllRounds(allRoundsCp);
+    setClaimableRounds(claimableCp);
   };
 
   return (
@@ -176,7 +240,7 @@ const Bet = () => {
       style={{
         display: "flex",
         gap: "10px",
-        padding: "30px",
+        padding: "20px",
         justifyContent: "space-between",
       }}
     >
@@ -187,7 +251,31 @@ const Bet = () => {
           flexDirection: "column",
         }}
       >
-        {newBet && <NewBet />}
+        {isBetting && (
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: "10px",
+            }}
+          >
+            <div>Betting & waiting for VRF...</div>{" "}
+            <Lottie
+              options={{
+                loop: true,
+                autoplay: true,
+                animationData: animationData,
+                rendererSettings: {
+                  preserveAspectRatio: "xMidYMid slice",
+                },
+              }}
+              height={300}
+              width={300}
+            />
+          </div>
+        )}
+        {!isBetting && newBet && <NewBet setIsBetting={setIsBetting} />}
         {allResults && allRounds.length > 0 && (
           <BetHistory
             rounds={allRounds}
@@ -240,7 +328,7 @@ const Bet = () => {
         <IconButton
           icon={faCoins}
           text="CLAIM"
-          handler={() => handleClaim([currentBet.round])}
+          handler={() => handleClaim([currentBet.epoch])}
           isDisabled={
             !currentBet || currentBet.claimed || currentBet.resultType === "0"
           }
@@ -248,7 +336,7 @@ const Bet = () => {
         <IconButton
           icon={faHammer}
           text="MINT"
-          handler={() => handleMint([currentBet.round])}
+          handler={() => handleMint([currentBet.epoch])}
           isDisabled={!currentBet || currentBet.minted}
         />
         <IconButton

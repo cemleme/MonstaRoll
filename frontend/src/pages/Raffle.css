@@ -1,0 +1,27 @@
+.raffleContainer {
+    display:flex;
+    flex-direction: column;
+    margin:30px;
+    gap:30px;
+}
+
+.raffleCard {
+    background-color: white;
+    box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+    display: flex;
+    flex-direction: column;
+    gap:30px;
+    padding: 30px;
+    min-width: 400px;
+}
+
+.raffleCardVertical {
+    display: flex;
+    flex-direction: column;
+    gap:10px;
+}
+
+.raffleCardHorizontal {
+    display: flex;
+    gap:60px;
+}

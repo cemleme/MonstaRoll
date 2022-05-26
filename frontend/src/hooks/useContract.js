@@ -2,7 +2,7 @@ import { useEffect, useState, useContext } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import Web3 from "web3";
 import abi from "../constants/abi.json";
-import rpcs from "../constants/rpcs";
+import config from "../constants/config";
 import contracts from "../constants/contracts";
 import ConnectContext from "./ConnectContext";
 
@@ -12,15 +12,19 @@ const useContract = () => {
   const [contract, setContract] = useState(null);
 
   useEffect(() => {
-    const monstaRollContract = getContract(true);
-    setContract(monstaRollContract);
+    if (network && config[network]) {
+      const monstaRollContract = getContract(true);
+      setContract(monstaRollContract);
+    }
   }, [network, wallet]);
 
   const getContract = (update = false) => {
-    if (contract && !update) return contract;
-    const web3 = wallet || new Web3(rpcs[network]);
-    const monstaRollContract = new web3.eth.Contract(abi, contracts[network]);
-    return monstaRollContract;
+    if (network && config[network]) {
+      if (contract && !update) return contract;
+      const web3 = wallet || new Web3(config[network].rpc);
+      const monstaRollContract = new web3.eth.Contract(abi, contracts[network]);
+      return monstaRollContract;
+    }
   };
 
   //options= { functionName: string, arguments: array, getPromise: boolean}
@@ -50,14 +54,16 @@ const useContract = () => {
 
     const txOptions = { from: address };
 
-    if (options.value) {
+    if (!options.valueInWei && options.value) {
       txOptions.value = wallet.utils.toWei(options.value.toString());
     }
 
     let err = null;
     const args = options.arguments || [];
 
-    console.log("sendContract txoptions", txOptions);
+    // console.log("sendContract args", args);
+    // console.log("sendContract options", options);
+    // console.log("sendContract txoptions", txOptions);
 
     // try {
     //   await contract.methods[options.functionName](...args).estimateGas(
@@ -91,22 +97,23 @@ const useContract = () => {
   };
 
   const bet = async (numBet, amount) => {
-    if (!contract) return;
+    if (!contract) return null;
     const result = await sendContract({
       functionName: "play",
       arguments: [numBet],
       value: amount,
     });
+    return result;
   };
 
   const mint = async (rounds) => {
     if (!contract || rounds.length === 0) return;
     const result = await sendContract({
       functionName: "mintBet",
-      arguments: [rounds]
+      arguments: [rounds],
     });
     return result;
-  }
+  };
 
   const getUserBets = async () => {
     if (!address) return;
@@ -129,22 +136,173 @@ const useContract = () => {
   const claimBet = async (rounds) => {
     if (!contract || rounds.length === 0) return;
     const result = await sendContract({
-        functionName: "claimBet",
-        arguments: [rounds]
-      });
+      functionName: "claimBet",
+      arguments: [rounds],
+    });
     return result;
-  }
+  };
 
-  const getNFTBalance = async(id) => {
+  const getNFTBalance = async (id) => {
     if (!address) return;
     const [err, result] = await callContract({
       functionName: "balanceOf",
       arguments: [address, id],
     });
     return result;
+  };
+
+  const getCurrentRaffleRoundNo = async () => {
+    const [, roundNo] = await callContract({
+      functionName: "currentRaffleRound",
+    });
+    return roundNo;
+  };
+
+  const getRaffleRoundData = async (roundNo) => {
+    const [, roundData] = await callContract({
+      functionName: "raffleRounds",
+      arguments: [roundNo],
+    });
+    return roundData;
+  };
+
+  const getCurrentRaffleBalance = async () => {
+    const roundNo = await getCurrentRaffleRoundNo();
+    const roundData = await getRaffleRoundData(roundNo);
+    const web3 = wallet || new Web3(config[network].rpc);
+    return web3.utils.fromWei(roundData.balance);
+  };
+
+  const getUserRaffleTickets = async (roundNo) => {
+    if (!address) return 0;
+    const [, tickets] = await callContract({
+      functionName: "userRaffleTickets",
+      arguments: [address, roundNo],
+    });
+    return tickets || 0;
+  };
+
+  const getTotalRaffleTickets = async () => {
+    const [, tickets] = await callContract({
+      functionName: "getTotalRaffleTickets",
+    });
+    return tickets || 0;
+  };
+
+  const getRaffleResult = async (roundNo) => {
+    const [, roundData] = await callContract({
+      functionName: "raffleRounds",
+      arguments: [roundNo],
+    });
+
+    const raffleDuration = 600;
+
+    const web3 = wallet || new Web3(config[network].rpc);
+    roundData.balance = web3.utils.fromWei(roundData.balance);
+    roundData.timeLeft =
+      parseInt(roundData.startTimestamp) +
+      raffleDuration -
+      Math.ceil(Date.now() / 1000);
+
+    return roundData;
+  };
+
+  const executeRaffleRound = async () => {
+    if (!contract) return;
+    const result = await sendContract({
+      functionName: "executeRaffleRound",
+    });
+    return result;
+  };
+
+  const cancelSale = async (saleId) => {
+    if (!contract) return;
+    const result = await sendContract({
+      functionName: "cancelSale",
+      arguments: [saleId],
+    });
+    return result;
+  };
+
+  const putNFTOnSale = async (tokenId, price) => {
+    if (!contract) return;
+    const priceWei = Web3.utils.toWei(price.toString());
+    const result = await sendContract({
+      functionName: "putOnSale",
+      arguments: [tokenId, priceWei],
+    });
+    return result;
+  };
+
+  const checkIfNFTOnSale = async (token_id) => {
+    const [, isOnSale] = await callContract({
+      functionName: "isTokenOnSale",
+      arguments: [address, token_id],
+    });
+    return isOnSale;
+  };
+
+  const checkIfClaimableNFTRaffle = async () => {
+    if(!address) return false;
+    const [, isClaimable] = await callContract({
+      functionName: "claimableNFTRaffle",
+      arguments: [address],
+    });
+    return isClaimable;
   }
 
-  return { bet, getUserBets, getBet, mint, claimBet, getNFTBalance };
+  const buyNFT = async (saleId, price) => {
+    if (!contract) return;
+    const result = await contract.methods.buyNFT(saleId).send({from:address, value:'400000000000000000'});
+    console.log(result);
+    return result;
+    // const result = await sendContract({
+    //   functionName: "buyNFT",
+    //   arguments: [saleId],
+    //   valueInWei: true,
+    //   value: price,
+    // });
+    // return result;
+  };
+
+  const claimRaffle = async (roundNo) => {
+    if (!contract) return;
+    const result = await sendContract({
+      functionName: "claimRaffle",
+      arguments: [roundNo],
+    });
+    return result;
+  };
+
+  const claimNFTRaffle = async () => {
+    if (!contract) return;
+    const result = await sendContract({
+      functionName: "claimNFTRaffle",
+    });
+    return result;
+  };
+
+  return {
+    bet,
+    getUserBets,
+    getBet,
+    mint,
+    claimBet,
+    getNFTBalance,
+    getRaffleResult,
+    executeRaffleRound,
+    getCurrentRaffleBalance,
+    getCurrentRaffleRoundNo,
+    getUserRaffleTickets,
+    getTotalRaffleTickets,
+    cancelSale,
+    checkIfNFTOnSale,
+    putNFTOnSale,
+    buyNFT,
+    claimNFTRaffle,
+    claimRaffle,
+    checkIfClaimableNFTRaffle
+  };
 };
 
 export default useContract;

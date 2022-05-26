@@ -1,4 +1,3 @@
-import { useEffect, useState } from "react";
 import Monsters from "./Monsters";
 import BetResult from "./BetResult";
 import IconButton from "../components/IconButton";
@@ -28,18 +27,18 @@ const BetRow = ({ round, handleClaim, handleMint }) => {
           }}
         >
           <Monsters roundResult={round.result} size={2} />
-          {(round.claimed || round.resultType === "0") && (
+          {(!round.claimed && round.resultType !== "0") && (
             <IconButton
               text="CLAIM"
               isSmall={true}
-              handler={() => handleClaim([round.round])}
+              handler={() => handleClaim([round.epoch])}
             />
           )}
           {!round.minted && (
             <IconButton
               text="MINT"
               isSmall={true}
-              handler={() => handleMint([round.round])}
+              handler={() => handleMint([round.epoch])}
             />
           )}
         </div>

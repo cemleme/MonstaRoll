@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Skranji&display=swap');
 body {
   margin: 0;
+  margin-top:70px;
   background-color: #469b4c;
   font-family: 'Skranji', cursive;
   -webkit-font-smoothing: antialiased;

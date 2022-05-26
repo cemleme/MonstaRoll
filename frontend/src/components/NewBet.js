@@ -8,7 +8,7 @@ import useContract from "../hooks/useContract";
 import { useSelector } from "react-redux";
 import ConnectContext from "../hooks/ConnectContext";
 
-const NewBet = () => {
+const NewBet = ({setIsBetting}) => {
   const { address, wallet, connect } = useContext(ConnectContext);
   const { bet } = useContract();
   const [numBets, setNumBets] = useState(1);
@@ -19,7 +19,11 @@ const NewBet = () => {
   };
 
   const submitBetHandler = async () => {
+    setIsBetting(true);
     const result = await bet(numBets, totalBet);
+    console.log('bet result', result);
+    if(!result.status)
+      setIsBetting(false);
   }
 
   return (
