@@ -52,7 +52,7 @@
     width: 27px;
     height: 32px;
     border: 0;
-    background: url('http://localhost:3000/assets/slider2.png');
+    background: url('https://monstaroll.surge.sh/assets/slider2.png');
     cursor: pointer;
   }
   
@@ -60,6 +60,6 @@
     width: 27px;
     height: 32px;
     border: 0;
-    background: url('http://localhost:3000/assets/slider2.png');
+    background: url('https://monstaroll.surge.sh/assets/slider2.png');
     cursor: pointer;
   }
